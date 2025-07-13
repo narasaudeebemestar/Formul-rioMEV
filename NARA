@@ -1,0 +1,121 @@
+function doPost(e) {
+  try {
+    // Validação inicial dos dados recebidos
+    if (!e.postData || !e.postData.contents) {
+      return createErrorResponse("Dados não fornecidos", 400);
+    }
+
+    // Parse dos dados JSON com tratamento de erro
+    let dados;
+    try {
+      dados = JSON.parse(e.postData.contents);
+    } catch (parseError) {
+      return createErrorResponse("Formato JSON inválido", 400);
+    }
+
+    // Validação de campos obrigatórios
+    if (!dados.nome || !dados.email) {
+      return createErrorResponse("Nome e email são obrigatórios", 400);
+    }
+
+    // Validação de formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(dados.email)) {
+      return createErrorResponse("Email inválido", 400);
+    }
+
+    // Acesso à planilha com tratamento de erro
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    if (!spreadsheet) {
+      return createErrorResponse("Planilha não encontrada", 500);
+    }
+
+    const sheet = spreadsheet.getActiveSheet();
+    
+    // Criar header se a planilha estiver vazia
+    if (sheet.getLastRow() === 0) {
+      const headers = [
+        "Data/Hora",
+        "Nome", 
+        "Email",
+        "Frutas/Vegetais",
+        "Industrializados",
+        "Atividade Física",
+        "Fuma",
+        "Álcool",
+        "PSS-10",
+        "Classificação"
+      ];
+      sheet.appendRow(headers);
+    }
+
+    // Preparar dados para inserção
+    const novaLinha = [
+      new Date(),
+      dados.nome?.trim() || "",
+      dados.email?.trim().toLowerCase() || "",
+      dados.frutas_vegetais || "",
+      dados.industrializados || "",
+      dados.atividade_fisica || "",
+      dados.fuma || "",
+      dados.alcool || "",
+      dados["PSS-10"] || "",
+      dados["Classificacao"] || ""
+    ];
+
+    // Inserir dados na planilha
+    sheet.appendRow(novaLinha);
+
+    // Log para debug (opcional)
+    console.log(`Dados salvos para: ${dados.nome} (${dados.email})`);
+
+    // Resposta de sucesso
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Dados recebidos e salvos com sucesso",
+        timestamp: new Date().toISOString()
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    // Log do erro para debug
+    console.error("Erro no doPost:", error);
+    
+    return createErrorResponse("Erro interno do servidor", 500);
+  }
+}
+
+// Função auxiliar para criar respostas de erro
+function createErrorResponse(message, statusCode) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status: "error",
+      message: message,
+      statusCode: statusCode,
+      timestamp: new Date().toISOString()
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Função para testar localmente (opcional)
+function testDoPost() {
+  const testData = {
+    postData: {
+      contents: JSON.stringify({
+        nome: "João Silva",
+        email: "joao@email.com",
+        frutas_vegetais: "Sim",
+        industrializados: "Não",
+        atividade_fisica: "3x por semana",
+        fuma: "Não",
+        alcool: "Socialmente",
+        "PSS-10": "15",
+        "Classificacao": "Moderado"
+      })
+    }
+  };
+  
+  const result = doPost(testData);
+  console.log(result.getContent());
+}
